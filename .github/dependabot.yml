@@ -1,0 +1,16 @@
+# Keeps the locked Python packages and the pinned GitHub actions current.
+# A new release waits 7 days before Dependabot proposes it (cooldown).
+version: 2
+updates:
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+  - package-ecosystem: "github-actions"
+    directory: "/"  # also reads the root action.yml
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7

@@ -1,0 +1,725 @@
+{#
+  Skillabel HTML report. Single self-contained document: all CSS/JS
+  inline, zero external requests. All user-derived content is autoescaped.
+  Per skill: an aggregate dashboard header, a client-side control bar
+  (search / sort / severity + source filters), then collapsed-by-default cards
+  whose bodies render the fixed panels in order — Fires when / Needs / Does /
+  Produces / Touches / Costs — then Lints, then the Report card.
+#}
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="generator" content="skillabel">
+<title>{{ title }}</title>
+<style>
+  :root {
+    --bg: #0d0f12; --panel: #16191f; --panel-2: #1b1f27; --border: #262b33;
+    --text: #c9d1d9; --muted: #8b949e; --faint: #6b7280;
+    --accent: #4f8cff; --danger: #e5534b; --warn: #d9a531; --ok: #3fb950;
+    --gray: #30363d; --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 28px 20px 80px; }
+  header.top { border-bottom: 1px solid var(--border); padding-bottom: 18px; margin-bottom: 22px; }
+  header.top h1 { margin: 0 0 4px; font-size: 22px; letter-spacing: -0.01em; }
+  header.top .sub { color: var(--muted); font-size: 13px; }
+
+  /* Dashboard */
+  .dashboard { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; margin-top: 18px; }
+  .dcard { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+  .dcard .dl { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 6px; }
+  .dcard .row3 { display: flex; gap: 16px; flex-wrap: wrap; }
+  .stat { display: flex; flex-direction: column; }
+  .stat .n { font-size: 22px; font-weight: 600; font-family: var(--mono); }
+  .stat .n.err { color: var(--danger); } .stat .n.warn { color: var(--warn); }
+  .stat .n.drift { color: var(--danger); } .stat .n.dup { color: var(--muted); }
+  .stat .l { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  .dcard .tier { font-size: 11.5px; color: var(--faint); font-family: var(--mono); margin-top: 6px; line-height: 1.7; }
+  .toplist { list-style: none; margin: 2px 0 0; padding: 0; }
+  .toplist li { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; font-size: 12.5px; border-bottom: 1px solid var(--border); }
+  .toplist li:last-child { border-bottom: none; }
+  .toplist .t { font-family: var(--mono); color: var(--faint); white-space: nowrap; }
+  .toplist a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 16px; font-size: 12px; color: var(--muted); align-items: center; }
+  .legend .item { display: inline-flex; align-items: center; gap: 6px; }
+
+  /* Controls */
+  .controls { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--border);
+    padding: 12px 0; margin: 26px 0 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .controls input[type=search], .controls select {
+    background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 8px;
+    padding: 7px 10px; font: inherit; font-size: 13px; }
+  .controls input[type=search] { flex: 1 1 220px; min-width: 160px; }
+  .controls input[type=search]::placeholder { color: var(--faint); }
+  .controls select { cursor: pointer; }
+  .controls label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  .chips { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+  .chip-filter { font: inherit; font-size: 12px; cursor: pointer; padding: 6px 11px; border-radius: 999px;
+    background: var(--panel-2); color: var(--muted); border: 1px solid var(--border); }
+  .chip-filter:hover { border-color: #384049; }
+  .chip-filter.active { background: rgba(79,140,255,.14); border-color: rgba(79,140,255,.5); color: #a9c6ff; }
+  .ctl-btn { font: inherit; font-size: 12px; cursor: pointer; padding: 6px 10px; border-radius: 8px;
+    background: transparent; color: var(--muted); border: 1px solid var(--border); }
+  .ctl-btn:hover { border-color: #384049; color: var(--text); }
+  .showing { font-size: 12px; color: var(--faint); font-family: var(--mono); margin-left: auto; }
+
+  .badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-family: var(--mono);
+    padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); white-space: nowrap; }
+  .badge.present { background: rgba(229,83,75,.14); border-color: rgba(229,83,75,.5); color: #ff8b83; }
+  .badge.partial { background: transparent; border-style: dashed; border-color: var(--gray); color: var(--muted); }
+  .badge.unchecked { background: transparent; border-style: dashed; border-color: var(--gray); color: var(--muted); }
+  .badge.absent  { background: rgba(139,148,158,.08); border-color: var(--gray); color: var(--muted); }
+  .badge.unknown { background: transparent; border-style: dashed; color: var(--faint); }
+  .badge .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  .src-badge { font-family: var(--mono); font-size: 10.5px; color: var(--muted); background: var(--panel-2);
+    border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
+  .drift-badge { font-family: var(--mono); font-size: 10.5px; border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
+  .drift-badge.dup { color: var(--muted); background: rgba(139,148,158,.08); border: 1px solid var(--gray); }
+  .drift-badge.drift { color: #ffb3ad; background: rgba(229,83,75,.18); border: 1px solid var(--danger);
+    font-weight: 700; letter-spacing: .04em; box-shadow: 0 0 0 1px rgba(229,83,75,.35) inset; }
+
+  .grade { display: inline-flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 11px;
+    padding: 2px 8px; border-radius: 6px; border: 1px solid var(--border); }
+  .grade .g { font-weight: 700; }
+  .g-A { color: var(--ok); } .g-B { color: #74c98a; } .g-C { color: var(--warn); }
+  .g-D { color: #e6965c; } .g-F { color: var(--danger); }
+
+  .pill-err, .pill-warn { font-family: var(--mono); font-size: 11px; padding: 1px 7px; border-radius: 999px; }
+  .pill-err { background: rgba(229,83,75,.14); color: #ff8b83; }
+  .pill-warn { background: rgba(217,165,49,.14); color: #e3c26a; }
+
+  /* Collapsible skill card */
+  details.skill { background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    margin-bottom: 12px; scroll-margin-top: 74px; }
+  details.skill[open] { border-color: #384049; }
+  summary.skill-sum { list-style: none; cursor: pointer; padding: 15px 18px; display: flex; gap: 14px;
+    align-items: flex-start; justify-content: space-between; }
+  summary.skill-sum::-webkit-details-marker { display: none; }
+  summary.skill-sum:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 12px; }
+  .sum-main { min-width: 0; flex: 1 1 auto; }
+  .sum-title { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .sum-title h3 { margin: 0; font-size: 16px; color: var(--text); }
+  .chev { color: var(--faint); font-size: 10px; transition: transform .15s ease; display: inline-block; }
+  details.skill[open] .chev { transform: rotate(90deg); }
+  summary.skill-sum .desc { color: var(--muted); font-size: 12.5px; margin: 6px 0 0;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  summary.skill-sum .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 10px; }
+  .sum-meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end;
+    font-size: 12px; color: var(--muted); font-family: var(--mono); flex: 0 0 auto; }
+  .keyless-tag { color: var(--faint); }
+  .diffline { color: #ffb3ad; font-size: 11.5px; margin-top: 8px; }
+
+  /* Usage */
+  .usage-line { display: inline-flex; align-items: center; gap: 7px; font-family: var(--mono);
+    font-size: 11.5px; color: var(--muted); }
+  .usage-line .u-n { color: var(--text); font-weight: 600; }
+  .usage-line .u-sep { color: var(--faint); }
+  .usage-line .u-h { color: var(--faint); }
+  .usage-never { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono);
+    font-size: 11.5px; color: var(--warn); }
+  .usage-never .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .7; }
+  .u-stat .n.used { color: var(--accent); }
+  .u-stat .n.never { color: var(--warn); }
+
+  .skill-body { padding: 4px 20px 18px; border-top: 1px solid var(--border); }
+  .skill-body .path { font-family: var(--mono); font-size: 12px; color: var(--faint); margin: 12px 0 10px; }
+
+  .keyless { background: var(--panel-2); border: 1px dashed var(--border); border-radius: 8px;
+    padding: 10px 12px; color: var(--muted); font-size: 12.5px; margin: 10px 0; }
+
+  .panel { border-top: 1px solid var(--border); padding: 14px 0; }
+  .panel:first-of-type { border-top: none; }
+  .panel .ph { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+  .panel .ph .name { font-size: 12px; text-transform: uppercase; letter-spacing: .07em; color: var(--accent); font-weight: 600; }
+  .panel .ph .hint { font-size: 11px; color: var(--faint); }
+  .items { display: flex; flex-direction: column; gap: 9px; }
+  .item { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 9px 11px; }
+  .item .head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .item .n { font-family: var(--mono); color: var(--faint); font-size: 12px; }
+  .item .k { font-family: var(--mono); font-size: 11px; color: var(--muted); background: var(--panel); border: 1px solid var(--border); border-radius: 5px; padding: 0 6px; }
+  .item .req { font-size: 10.5px; color: var(--faint); text-transform: uppercase; letter-spacing: .05em; }
+  .item .body { margin-top: 4px; color: var(--text); font-size: 13px; }
+  .tools { display: inline-flex; gap: 5px; flex-wrap: wrap; }
+  .tool { font-family: var(--mono); font-size: 10.5px; color: var(--muted); background: var(--panel); border: 1px solid var(--border); border-radius: 5px; padding: 0 6px; }
+  .muted-line { color: var(--muted); font-size: 12.5px; }
+  ul.plain { margin: 0; padding-left: 18px; }
+  ul.plain li { margin: 2px 0; }
+
+  .ev { display: inline-flex; gap: 4px; flex-wrap: wrap; margin-left: 2px; vertical-align: middle; }
+  .chip { font-family: var(--mono); font-size: 10.5px; color: var(--accent); background: rgba(79,140,255,.1);
+    border: 1px solid rgba(79,140,255,.28); border-radius: 4px; padding: 0 5px; cursor: help; }
+  .tag-ai { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
+    margin-left: 8px; padding: 1px 6px; border: 1px dashed var(--border); border-radius: 4px; color: var(--muted); }
+  .tag-inferred { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
+    color: #e3c26a; background: rgba(217,165,49,.12); border: 1px solid rgba(217,165,49,.4); border-radius: 4px; padding: 0 5px; }
+  .src { font-family: var(--mono); font-size: 10px; color: var(--faint); }
+
+  table.lints, table.rc { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.lints th, table.rc th { text-align: left; color: var(--muted); font-weight: 500; font-size: 11px;
+    text-transform: uppercase; letter-spacing: .05em; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  table.lints td, table.rc td { padding: 7px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .sev-error { color: #ff8b83; font-family: var(--mono); font-size: 11px; }
+  .sev-warning { color: #e3c26a; font-family: var(--mono); font-size: 11px; }
+  .sev-info { color: var(--muted); font-family: var(--mono); font-size: 11px; }
+
+  .dim { border: 1px solid var(--border); border-radius: 8px; padding: 11px 13px; margin-bottom: 9px; background: var(--panel-2); }
+  .dim .dh { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+  .dim .dn { font-size: 13px; font-weight: 600; }
+  .finding { color: var(--text); font-size: 12.5px; margin: 4px 0; }
+
+  .empty { color: var(--muted); text-align: center; padding: 60px 20px; border: 1px dashed var(--border); border-radius: 12px; }
+  .noresults { color: var(--muted); text-align: center; padding: 30px 20px; display: none; }
+  footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--border); color: var(--faint); font-size: 11.5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+{% macro evidence(fact) %}
+  {% if fact and fact.evidence and fact.evidence.lines %}
+  <span class="ev">
+    {% for ln in fact.evidence.lines %}
+    <span class="chip" title="{{ fact.evidence.quote }}">{% if fact.evidence.file %}{{ fact.evidence.file }}:{% endif %}L{{ ln }}</span>
+    {% endfor %}
+  </span>
+  {% endif %}
+{% endmacro %}
+
+{% macro inferred(fact) %}
+  {%- if fact and fact.inferred %}<span class="tag-inferred">inferred</span>{% endif -%}
+{% endmacro %}
+
+{% macro grade_chip(name, grade) %}
+  <span class="grade" title="{{ name }}: grade {{ grade }}"><span>{{ name }}</span><span class="g g-{{ grade }}">{{ grade }}</span></span>
+{% endmacro %}
+
+<header class="top">
+  <h1>{{ title }}</h1>
+  <div class="sub">Nutrition labels for agent skills — surface area with evidence, never verdicts.</div>
+
+  <div class="dashboard">
+    <div class="dcard">
+      <div class="dl">Coverage</div>
+      <div class="row3">
+        <span class="stat"><span class="n">{{ dashboard.skills }}</span><span class="l">skills</span></span>
+        <span class="stat"><span class="n">{{ dashboard.sources }}</span><span class="l">sources</span></span>
+      </div>
+    </div>
+    <div class="dcard">
+      <div class="dl">Lints</div>
+      <div class="row3">
+        <span class="stat"><span class="n err">{{ dashboard.errors }}</span><span class="l">errors</span></span>
+        <span class="stat"><span class="n warn">{{ dashboard.warnings }}</span><span class="l">warnings</span></span>
+      </div>
+    </div>
+    <div class="dcard">
+      <div class="dl">Context cost</div>
+      <div class="row3">
+        <span class="stat"><span class="n">{{ dashboard.tokens }}</span><span class="l">est. tokens</span></span>
+      </div>
+      <div class="tier">
+        always {{ dashboard.tier.description }} · on-trigger {{ dashboard.tier.body }} · on-demand {{ dashboard.tier.reference }}
+      </div>
+    </div>
+    <div class="dcard">
+      <div class="dl">Risk surface</div>
+      <div class="row3">
+        <span class="stat"><span class="n">{{ dashboard.risk_dist.runs_shell }}</span><span class="l">{{ dashboard.risk_labels.runs_shell }}</span></span>
+        <span class="stat"><span class="n">{{ dashboard.risk_dist.network }}</span><span class="l">{{ dashboard.risk_labels.network }}</span></span>
+        <span class="stat"><span class="n">{{ dashboard.risk_dist.writes_files }}</span><span class="l">{{ dashboard.risk_labels.writes_files }}</span></span>
+      </div>
+    </div>
+    <div class="dcard">
+      <div class="dl">Duplicates across sources</div>
+      <div class="row3">
+        <span class="stat"><span class="n dup">{{ dashboard.duplicate_groups }}</span><span class="l">identical</span></span>
+        <span class="stat"><span class="n drift">{{ dashboard.drift_groups }}</span><span class="l">drift</span></span>
+      </div>
+    </div>
+    {% if dashboard.top5 %}
+    <div class="dcard" style="grid-column: span 2;">
+      <div class="dl">Heaviest by context cost</div>
+      <ul class="toplist">
+        {% for t in dashboard.top5 %}
+        <li><a class="jump" href="#skill-{{ t.uid }}">{{ t.name }}</a>{% if t.copies > 1 %} <span class="muted">&times;{{ t.copies }}</span>{% endif %}<span class="t">~{{ t.tokens }} tok</span></li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+    {% if usage %}
+    <div class="dcard">
+      <div class="dl">Usage — do I even use this? <span class="muted" style="font-weight:normal">(explicit invocations in local logs — a lower bound; ambient loads leave no trace)</span></div>
+      <div class="row3">
+        <span class="stat u-stat"><span class="n never">{{ usage.never_used_count }}</span><span class="l">never used</span></span>
+        <span class="stat u-stat"><span class="n used">{{ usage.total_uses }}</span><span class="l">total uses</span></span>
+      </div>
+      <div class="tier">
+        claude {{ usage.by_harness.claude }} · codex {{ usage.by_harness.codex }}
+        {% if usage.unmatched_count %} · {{ usage.unmatched_count }} unmatched{% endif %}
+      </div>
+    </div>
+    {% if usage.top5 %}
+    <div class="dcard" style="grid-column: span 2;">
+      <div class="dl">Most used</div>
+      <ul class="toplist">
+        {% for t in usage.top5 %}
+        <li>{% if t.uid %}<a class="jump" href="#skill-{{ t.uid }}">{{ t.name }}</a>{% else %}<span>{{ t.name }}</span>{% endif %}<span class="t">{{ t.uses }} use{{ '' if t.uses == 1 else 's' }}</span></li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+    {% endif %}
+  </div>
+
+  <div class="legend">
+    <span class="item"><span class="badge present"><span class="dot"></span>present</span> risk observed</span>
+    <span class="item"><span class="badge absent"><span class="dot"></span>absent</span> no pattern matched in SKILL.md text and bundled text files</span>
+    <span class="item"><span class="badge partial"><span class="dot"></span>partial</span> no pattern matched in the files read; some files were not read</span>
+    <span class="item"><span class="badge unchecked"><span class="dot"></span>not checked</span> SKILL.md was not read, or the skill folder is a link</span>
+    <span class="item"><span class="drift-badge drift">DRIFT</span> same skill differs across sources</span>
+    <span class="item"><span class="tag-inferred">inferred</span> AI inferred, not stated</span>
+    <span class="item"><span class="chip">L1</span> evidence line (hover for quote)</span>
+  </div>
+</header>
+
+{% if not views %}
+<div class="empty">
+  <p>No skills found.</p>
+  <p class="muted-line">Run <code>skillabel auto</code> or <code>skillabel scan &lt;path&gt;</code> to produce labels, then re-open this report.</p>
+</div>
+{% else %}
+
+<div class="controls">
+  <input type="search" id="q" placeholder="Search name or description…" autocomplete="off" aria-label="Search skills">
+  <label for="sort">Sort</label>
+  <select id="sort" aria-label="Sort skills">
+    <option value="name">Name (A–Z)</option>
+    <option value="cost">Context cost (high→low)</option>
+    <option value="errors">Errors (high→low)</option>
+    <option value="risk">Risk count (high→low)</option>
+    {% if usage %}<option value="usage">Most used (high→low)</option>{% endif %}
+  </select>
+  <div class="chips" role="group" aria-label="Filter by severity">
+    <button type="button" class="chip-filter active" data-sev="all" aria-pressed="true">all</button>
+    <button type="button" class="chip-filter" data-sev="errors" aria-pressed="false">has errors</button>
+    <button type="button" class="chip-filter" data-sev="warnings" aria-pressed="false">has warnings</button>
+    <button type="button" class="chip-filter" data-sev="clean" aria-pressed="false">clean</button>
+  </div>
+  {% if usage %}
+  <div class="chips" role="group" aria-label="Filter by usage">
+    <button type="button" class="chip-filter" id="never-used-chip" data-usefilter="never" aria-pressed="false">never used</button>
+  </div>
+  {% endif %}
+  {% if multi_source %}
+  <label for="src">Source</label>
+  <select id="src" aria-label="Filter by source">
+    <option value="*">all sources</option>
+    {% for s in dashboard.source_list %}
+    <option value="{{ s.value }}">{{ s.label }}</option>
+    {% endfor %}
+  </select>
+  {% endif %}
+  <button type="button" class="ctl-btn" id="expand-all">expand all</button>
+  <button type="button" class="ctl-btn" id="collapse-all">collapse all</button>
+  <span class="showing" id="showing"></span>
+</div>
+
+<div class="noresults" id="noresults">No skills match the current filters.</div>
+
+<div id="skills">
+{% for v in views %}
+{% set label = v.label %}
+<details class="skill" id="skill-{{ v.uid }}"
+  data-search="{{ (label.name ~ ' ' ~ label.description) | lower }}"
+  data-name="{{ label.name | lower }}"
+  data-cost="{{ v.total_tokens }}"
+  data-errors="{{ v.lint_counts.errors }}"
+  data-warnings="{{ v.lint_counts.warnings }}"
+  data-risk="{{ v.risk_count }}"
+  data-severity="{{ v.severity }}"
+  data-source="{{ v.source or '' }}"
+{% if v.usage %}
+  data-usage="{{ v.usage.uses }}"
+  data-used="{{ 1 if v.usage.used else 0 }}"
+{% endif %}
+  data-drift="{{ v.drift.status if v.drift else 'none' }}">
+  <summary class="skill-sum">
+    <div class="sum-main">
+      <div class="sum-title">
+        <span class="chev" aria-hidden="true">▶</span>
+        <h3>{{ label.name }}</h3>
+        {% if v.source_label %}<span class="src-badge" title="{{ v.source }}">{{ v.source_label }}</span>{% endif %}
+        {% if v.drift %}
+          {% if v.drift.status == 'drift' %}
+          <span class="drift-badge drift" title="same skill differs across {{ v.drift.peers }} sources">DRIFT</span>
+          {% else %}
+          <span class="drift-badge dup" title="identical across {{ v.drift.peers }} sources">duplicate (identical)</span>
+          {% endif %}
+        {% endif %}
+      </div>
+      <p class="desc">{{ label.description }}</p>
+      {% if v.drift and v.drift.status == 'drift' %}
+      <div class="diffline">differs across sources: {{ v.drift.diffs | join(', ') }}</div>
+      {% endif %}
+      <div class="row">
+      {% for b in v.badges %}
+        <span class="badge {{ b.state }}" data-kind="{{ b.kind }}" title="{{ b.label }}: {{ b.title }}"><span class="dot"></span>{{ b.label }}</span>
+      {% endfor %}
+      {% for g in v.grades %}{{ grade_chip(g.name, g.grade) }}{% endfor %}
+      {% if v.not_read and not v.unread %}<span class="muted" title="see Touches">{{ v.not_read }} file(s) not read</span>{% endif %}
+      </div>
+      {% if v.usage %}
+      <div class="row">
+        {% if v.usage.used %}
+        <span class="usage-line" title="local session-log usage — {{ usage.generated_at }}">
+          <span class="u-n">{{ v.usage.uses }}</span> use{{ '' if v.usage.uses == 1 else 's' }}
+          {% if v.usage.last_rel %}<span class="u-sep">·</span> last used {{ v.usage.last_rel }}{% endif %}
+          <span class="u-sep">·</span> <span class="u-h">claude {{ v.usage.claude }} / codex {{ v.usage.codex }}</span>
+        </span>
+        {% else %}
+        <span class="usage-never" title="not seen in any local session log">
+          <span class="dot"></span>never used
+        </span>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+    <div class="sum-meta">
+      {% if v.lint_counts.errors %}<span class="pill-err">{{ v.lint_counts.errors }} err</span>{% endif %}
+      {% if v.lint_counts.warnings %}<span class="pill-warn">{{ v.lint_counts.warnings }} warn</span>{% endif %}
+      <span class="tok">~{{ v.total_tokens }} tok</span>
+      {% if not label.ai_enriched %}<span class="keyless-tag" title="deterministic only">keyless</span>{% endif %}
+    </div>
+  </summary>
+
+  <div class="skill-body">
+  <div class="path">{{ label.source_path }}</div>
+
+  {% if not label.ai_enriched %}
+  <div class="keyless">{{ keyless_note }} Deterministic panels (Touches, Costs, Lints) are shown below.</div>
+  {% endif %}
+
+  {# 1. Fires when #}
+  <div class="panel">
+    <div class="ph"><span class="name">Fires when</span><span class="hint">trigger contract{{ inferred(label.trigger) }}</span>{% if label.ai_enriched %}<span class="tag-ai" title="AI summary of the skill's own text; the skill can steer it">AI summary of the skill's own text</span>{% endif %}</div>
+    {% if label.trigger.fires_when or label.trigger.skip_when %}
+    <div class="items">
+      {% if label.trigger.fires_when %}
+      <div class="item">
+        <div class="head"><span class="k">fires</span>{{ evidence(label.trigger) }}</div>
+        <ul class="plain">{% for f in label.trigger.fires_when %}<li>{{ f }}</li>{% endfor %}</ul>
+      </div>
+      {% endif %}
+      {% if label.trigger.skip_when %}
+      <div class="item">
+        <div class="head"><span class="k">skip</span></div>
+        <ul class="plain">{% for s in label.trigger.skip_when %}<li>{{ s }}</li>{% endfor %}</ul>
+      </div>
+      {% endif %}
+    </div>
+    {% elif not label.ai_enriched %}
+    <div class="muted-line">{{ keyless_note }}</div>
+    {% else %}
+    <div class="muted-line">No trigger conditions documented.</div>
+    {% endif %}
+  </div>
+
+  {# 2. Needs #}
+  <div class="panel">
+    <div class="ph"><span class="name">Needs</span><span class="hint">inputs &amp; prerequisites</span>{% if label.ai_enriched %}<span class="tag-ai" title="AI summary of the skill's own text; the skill can steer it">AI summary of the skill's own text</span>{% endif %}</div>
+    {% if label.inputs %}
+    <div class="items">
+      {% for inp in label.inputs %}
+      <div class="item">
+        <div class="head">
+          <span class="body" style="margin:0">{{ inp.name }}</span>
+          <span class="k">{{ input_kind_labels.get(inp.kind, inp.kind) }}</span>
+          <span class="req">{{ 'required' if inp.required else 'optional' }}</span>
+          {{ inferred(inp) }}{{ evidence(inp) }}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% elif not label.ai_enriched %}
+    <div class="muted-line">{{ keyless_note }}</div>
+    {% else %}
+    <div class="muted-line">No inputs documented.</div>
+    {% endif %}
+  </div>
+
+  {# 3. Does #}
+  <div class="panel">
+    <div class="ph"><span class="name">Does</span><span class="hint">flow</span>{% if label.ai_enriched %}<span class="tag-ai" title="AI summary of the skill's own text; the skill can steer it">AI summary of the skill's own text</span>{% endif %}</div>
+    {% if label.flow %}
+    <div class="items">
+      {% for step in label.flow %}
+      <div class="item">
+        <div class="head">
+          <span class="n">{{ step.n }}.</span>
+          <span class="body" style="margin:0">{{ step.action }}</span>
+          {% if step.tools %}<span class="tools">{% for t in step.tools %}<span class="tool">{{ t }}</span>{% endfor %}</span>{% endif %}
+          {{ inferred(step) }}{{ evidence(step) }}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% elif not label.ai_enriched %}
+    <div class="muted-line">{{ keyless_note }}</div>
+    {% else %}
+    <div class="muted-line">No flow documented.</div>
+    {% endif %}
+  </div>
+
+  {# 4. Produces #}
+  <div class="panel">
+    <div class="ph"><span class="name">Produces</span><span class="hint">outputs</span>{% if label.ai_enriched %}<span class="tag-ai" title="AI summary of the skill's own text; the skill can steer it">AI summary of the skill's own text</span>{% endif %}</div>
+    {% if label.outputs %}
+    <div class="items">
+      {% for out in label.outputs %}
+      <div class="item">
+        <div class="head">
+          <span class="body" style="margin:0">{{ out.what }}</span>
+          <span class="k">{{ out.kind }}</span>
+          {{ inferred(out) }}{{ evidence(out) }}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% elif not label.ai_enriched %}
+    <div class="muted-line">{{ keyless_note }}</div>
+    {% else %}
+    <div class="muted-line">No outputs documented.</div>
+    {% endif %}
+  </div>
+
+  {# 5. Touches #}
+  <div class="panel">
+    <div class="ph"><span class="name">Touches</span><span class="hint">audit surface — evidence, never a verdict</span></div>
+    {% if v.unread_env %}
+    <div class="muted-line">Not checked: named like a .env file, not read (see Lints).</div>
+    {% elif v.unread_link %}
+    <div class="muted-line">Not checked: a link or junction, not followed; it may hold a skill (see Lints).</div>
+    {% elif v.unread %}
+    <div class="muted-line">Not checked: SKILL.md was not read (see Lints).</div>
+    {% elif label.risk %}
+    <div class="items">
+      {% for rf in label.risk %}
+      <div class="item">
+        <div class="head">
+          <span class="badge {{ 'present' if rf.present else ('partial' if label.unscanned else 'absent') }}" data-kind="{{ rf.kind }}"><span class="dot"></span>{{ risk_labels.get(rf.kind, rf.kind) }}</span>
+          <span class="src">{{ "AI summary" if rf.source == "ai" else rf.source }}</span>
+          {{ inferred(rf) }}{{ evidence(rf) }}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="muted-line">No risk surface evaluated.</div>
+    {% endif %}
+    {% if label.unscanned %}
+    <div class="muted-line" style="margin-top:8px">Not read, so not checked:
+      {% for u in label.unscanned %}<span class="tool" title="{{ u.reason }}">{{ u.path }}</span> {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  {# 6. Costs #}
+  <div class="panel">
+    <div class="ph"><span class="name">Costs</span><span class="hint">context budget{% if label.cost and label.cost.estimate %} — estimate (chars ÷ 3.5){% endif %}</span></div>
+    {% if label.cost %}
+    <div class="items">
+      <div class="item"><div class="head"><span class="k">always in context</span><span class="body" style="margin:0">{{ label.cost.description_tokens }} tok — description</span></div></div>
+      <div class="item"><div class="head"><span class="k">on trigger</span><span class="body" style="margin:0">{{ label.cost.body_tokens }} tok — body</span></div></div>
+      {% for rfile in label.cost.reference_files %}
+      <div class="item"><div class="head">
+        <span class="k">on demand</span>
+        <span class="body" style="margin:0">{{ rfile.tokens }} tok — {{ rfile.path }}</span>
+        {% if not rfile.referenced_from_body %}<span class="req">unreferenced</span>{% endif %}
+      </div></div>
+      {% endfor %}
+      <div class="item"><div class="head"><span class="k">total</span><span class="body" style="margin:0">~{{ v.total_tokens }} tok</span></div></div>
+    </div>
+    {% else %}
+    <div class="muted-line">Cost not computed.</div>
+    {% endif %}
+    {% if label.resources %}
+    <div class="row" style="margin-top:8px">
+      {% for r in label.resources %}<span class="tool">{{ r }}</span>{% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  {# Lints #}
+  <div class="panel">
+    <div class="ph"><span class="name">Lints</span><span class="hint">deterministic checks</span></div>
+    {% if label.lints %}
+    <table class="lints">
+      <thead><tr><th>Rule</th><th>Severity</th><th>Line</th><th>Message</th></tr></thead>
+      <tbody>
+      {% for lint in label.lints %}
+      <tr>
+        <td><span class="src">{{ lint.rule }}</span></td>
+        <td><span class="sev-{{ lint.severity }}">{{ lint.severity }}</span></td>
+        <td>{% if lint.line %}<span class="chip">L{{ lint.line }}</span>{% else %}<span class="muted-line">—</span>{% endif %}</td>
+        <td>{{ lint.message }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="muted-line">No lint findings — clean.</div>
+    {% endif %}
+  </div>
+
+  {# Report card #}
+  <div class="panel">
+    <div class="ph"><span class="name">Report card</span><span class="hint">rubric-graded dimensions, findings cite lines</span>{% if label.ai_enriched %}<span class="tag-ai" title="AI summary of the skill's own text; the skill can steer it">AI summary of the skill's own text</span>{% endif %}</div>
+    {% if label.report_card %}
+    {% for dim in label.report_card %}
+    <div class="dim">
+      <div class="dh">
+        <span class="dn">{{ dimension_labels.get(dim.name, dim.name) }}</span>
+        <span class="grade"><span class="g g-{{ dim.grade }}">{{ dim.grade }}</span></span>
+      </div>
+      {% for finding in dim.findings %}
+      <div class="finding">
+        {{ finding.text }}
+        <span class="ev">{% for ln in finding.lines %}<span class="chip">L{{ ln }}</span>{% endfor %}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="keyless">{{ keyless_note }} No report card was generated in keyless mode.</div>
+    {% endif %}
+  </div>
+
+  </div>{# /skill-body #}
+</details>
+{% endfor %}
+</div>{# /skills #}
+{% endif %}
+
+<footer>
+  Generated by skillabel — a flashlight, not a sandbox. Surface area with evidence, never a safe/unsafe verdict.
+  {% if usage %}
+  <div style="margin-top:8px">
+    Usage read from local Claude Code and Codex session logs on {{ usage.generated_at }} — only skill names and
+    timestamps, never message content, and nothing leaves this machine.
+    {% if usage.unmatched_count %}
+    {{ usage.unmatched_count }} invocation(s) across {{ usage.unmatched_distinct }} unrecognized skill name(s)
+    (uninstalled, renamed, or project-local) were seen but not shown as cards.
+    {% endif %}
+  </div>
+  {% endif %}
+</footer>
+
+</div>
+
+<script>
+(function () {
+  var list = document.getElementById('skills');
+  if (!list) return;
+  var cards = Array.prototype.slice.call(list.querySelectorAll('details.skill'));
+  var q = document.getElementById('q');
+  var sortSel = document.getElementById('sort');
+  var srcSel = document.getElementById('src');
+  var sevChips = Array.prototype.slice.call(document.querySelectorAll('.chip-filter[data-sev]'));
+  var neverChip = document.getElementById('never-used-chip');
+  var showing = document.getElementById('showing');
+  var noresults = document.getElementById('noresults');
+  var sev = 'all';
+  var neverOnly = false;
+
+  function num(el, k) { return parseFloat(el.getAttribute(k)) || 0; }
+
+  function matches(c) {
+    var term = (q && q.value || '').trim().toLowerCase();
+    if (term && (c.getAttribute('data-search') || '').indexOf(term) === -1) return false;
+    if (sev === 'errors' && num(c, 'data-errors') <= 0) return false;
+    if (sev === 'warnings' && num(c, 'data-warnings') <= 0) return false;
+    if (sev === 'clean' && (num(c, 'data-errors') > 0 || num(c, 'data-warnings') > 0)) return false;
+    if (neverOnly && num(c, 'data-used') !== 0) return false;
+    if (srcSel && srcSel.value && srcSel.value !== '*' &&
+        c.getAttribute('data-source') !== srcSel.value) return false;
+    return true;
+  }
+
+  function apply() {
+    var shown = 0;
+    cards.forEach(function (c) {
+      var ok = matches(c);
+      c.style.display = ok ? '' : 'none';
+      if (ok) shown++;
+    });
+    if (showing) showing.textContent = 'showing ' + shown + ' of ' + cards.length;
+    if (noresults) noresults.style.display = shown === 0 ? 'block' : 'none';
+  }
+
+  function sortBy(key) {
+    var attr = { name: 'data-name', cost: 'data-cost', errors: 'data-errors', risk: 'data-risk', usage: 'data-usage' }[key] || 'data-name';
+    var factor = key === 'name' ? 1 : -1;
+    cards.sort(function (a, b) {
+      if (key === 'name') return a.getAttribute(attr).localeCompare(b.getAttribute(attr)) * factor;
+      return (num(a, attr) - num(b, attr)) * factor;
+    });
+    cards.forEach(function (c) { list.appendChild(c); });
+  }
+
+  if (q) q.addEventListener('input', apply);
+  if (srcSel) srcSel.addEventListener('change', apply);
+  if (sortSel) sortSel.addEventListener('change', function () { sortBy(sortSel.value); });
+  sevChips.forEach(function (ch) {
+    ch.addEventListener('click', function () {
+      sevChips.forEach(function (x) { x.classList.remove('active'); x.setAttribute('aria-pressed', 'false'); });
+      ch.classList.add('active'); ch.setAttribute('aria-pressed', 'true');
+      sev = ch.getAttribute('data-sev'); apply();
+    });
+  });
+  if (neverChip) neverChip.addEventListener('click', function () {
+    neverOnly = !neverOnly;
+    neverChip.classList.toggle('active', neverOnly);
+    neverChip.setAttribute('aria-pressed', neverOnly ? 'true' : 'false');
+    apply();
+  });
+
+  var expandAll = document.getElementById('expand-all');
+  var collapseAll = document.getElementById('collapse-all');
+  if (expandAll) expandAll.addEventListener('click', function () {
+    cards.forEach(function (c) { if (c.style.display !== 'none') c.open = true; });
+  });
+  if (collapseAll) collapseAll.addEventListener('click', function () {
+    cards.forEach(function (c) { c.open = false; });
+  });
+
+  function reveal(hash) {
+    if (!hash) return;
+    var el = document.getElementById(hash.replace('#', ''));
+    if (el && el.tagName.toLowerCase() === 'details') {
+      el.style.display = '';
+      el.open = true;
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+  document.addEventListener('click', function (e) {
+    var a = e.target && e.target.closest ? e.target.closest('a.jump') : null;
+    if (a) { e.preventDefault(); reveal(a.getAttribute('href')); }
+  });
+  if (location.hash) setTimeout(function () { reveal(location.hash); }, 0);
+
+  apply();
+})();
+</script>
+</body>
+</html>

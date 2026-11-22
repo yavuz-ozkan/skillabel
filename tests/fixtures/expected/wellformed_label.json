@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "name": "md-to-docx",
+  "source_path": "tests/fixtures/wellformed",
+  "description": "Convert Markdown files to Word documents (.docx) using pandoc. Use when the user asks to \"convert this to Word\", \"export as docx\", or names a .docx deliverable. Not for PDF output.",
+  "trigger": {
+    "evidence": {"lines": [9, 10], "quote": "Fires on: \"convert this markdown to Word\", \"export README.md as docx\""},
+    "inferred": false,
+    "fires_when": ["convert this markdown to Word", "export README.md as docx", "any request naming a .docx deliverable"],
+    "skip_when": ["PDF output requested", "Google Docs requested"]
+  },
+  "inputs": [
+    {"evidence": {"lines": [13], "quote": "The `pandoc` CLI must be installed"}, "inferred": false,
+     "name": "pandoc", "kind": "cli_tool", "required": true},
+    {"evidence": {"lines": [14], "quote": "Required input: the path to the source `.md` file."}, "inferred": false,
+     "name": "source markdown file", "kind": "file", "required": true},
+    {"evidence": {"lines": [15], "quote": "Optional input: a reference `.docx` template"}, "inferred": false,
+     "name": "reference .docx template", "kind": "file", "required": false}
+  ],
+  "flow": [
+    {"evidence": {"lines": [18], "quote": "run `pandoc --version` (Bash)"}, "inferred": false,
+     "n": 1, "action": "Verify pandoc is installed", "tools": ["Bash"]},
+    {"evidence": {"lines": [19], "quote": "run `pandoc <input>.md -o <output>.docx`"}, "inferred": false,
+     "n": 2, "action": "Convert the markdown file to .docx, applying the template when provided", "tools": ["Bash"]},
+    {"evidence": {"lines": [20], "quote": "Report the output file path"}, "inferred": false,
+     "n": 3, "action": "Report the output path to the user", "tools": []}
+  ],
+  "outputs": [
+    {"evidence": {"lines": [19]}, "inferred": false, "what": "the converted .docx file", "kind": "file"},
+    {"evidence": {"lines": [20]}, "inferred": false, "what": "output path reported in chat", "kind": "message"}
+  ],
+  "risk": [
+    {"evidence": {"lines": [18, 19], "quote": "run `pandoc ...` (Bash)"}, "inferred": false,
+     "kind": "runs_shell", "present": true, "source": "regex"},
+    {"evidence": {"lines": [19]}, "inferred": false, "kind": "writes_files", "present": true, "source": "ai"}
+  ],
+  "cost": {
+    "description_tokens": 55,
+    "body_tokens": 250,
+    "reference_files": [
+      {"path": "reference.md", "tokens": 70, "referenced_from_body": true},
+      {"path": "scripts/convert.py", "tokens": 120, "referenced_from_body": true}
+    ],
+    "estimate": true
+  },
+  "resources": ["reference.md", "scripts/convert.py"],
+  "lints": [],
+  "report_card": [
+    {"name": "trigger_precision", "grade": "A",
+     "findings": [{"text": "Concrete trigger phrases and an explicit skip rule (PDF) keep overtriggering unlikely.", "lines": [9, 10]}]},
+    {"name": "clarity", "grade": "A",
+     "findings": [{"text": "Three numbered steps, each with its tool named; no ambiguous instructions.", "lines": [17, 18, 19, 20]}]},
+    {"name": "context_efficiency", "grade": "A",
+     "findings": [{"text": "Short body; pandoc flag details correctly pushed to an on-demand reference file.", "lines": [22]}]},
+    {"name": "self_containedness", "grade": "A",
+     "findings": [{"text": "Both referenced resources exist and the bundled script is documented.", "lines": [22, 23, 24]}]},
+    {"name": "safety_transparency", "grade": "A",
+     "findings": [{"text": "Shell usage is explicit and scoped to pandoc invocations.", "lines": [18, 19]}]}
+  ],
+  "ai_enriched": true
+}

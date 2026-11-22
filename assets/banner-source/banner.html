@@ -1,0 +1,68 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Michroma&family=IBM+Plex+Mono:wght@400;500&family=Archivo+Black&family=Archivo+Narrow:wght@500;700&display=block" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1280px; height: 640px; background: #141210; }
+  .banner { position: relative; width: 1280px; height: 640px; overflow: hidden;
+    background: url('jar.png') center / 1280px 640px no-repeat; }
+
+  /* Left side: the same three lines as the hat banner */
+  .specs { position: absolute; left: 66px; top: 56px; font-family: 'IBM Plex Mono', monospace;
+    font-size: 14px; letter-spacing: 3px; text-transform: uppercase; color: rgba(242,232,213,0.55); }
+  .title { position: absolute; left: 60px; top: 248px; font-family: 'Michroma', sans-serif;
+    font-size: 70px; line-height: 1; letter-spacing: 5px; color: #F2E8D5;
+    text-shadow: 0 0 24px rgba(255,166,60,0.35); }
+  .tagline { position: absolute; left: 66px; top: 344px; font-family: 'IBM Plex Mono', monospace;
+    font-size: 20px; line-height: 1.5; color: rgba(242,232,213,0.85); }
+
+  /* Printing on the jar's blank label.
+     Inside the printed border the label spans about x 799-992, y 208-524 at 1280 wide. */
+  .facts { position: absolute; left: 808px; top: 214px; width: 176px; height: 304px;
+    color: #2b2118; mix-blend-mode: multiply; opacity: 0.92;
+    font-family: 'Archivo Narrow', 'Arial Narrow', sans-serif; }
+  .facts h1 { font-family: 'Archivo Black', 'Arial Black', sans-serif; font-weight: 400;
+    font-size: 27px; line-height: 1; letter-spacing: -0.6px; white-space: nowrap; }
+  .facts .serving { font-size: 13px; font-weight: 500; margin-top: 5px; white-space: nowrap; }
+  .facts .bar { height: 9px; background: #2b2118; margin: 5px 0 4px; }
+  .facts .bar.thin { height: 4px; margin: 4px 0 4px; }
+  .facts .cost { display: flex; justify-content: space-between; align-items: baseline;
+    padding-bottom: 3px; border-bottom: 1px solid #2b2118; }
+  .facts .cost b { font-family: 'Archivo Black', sans-serif; font-weight: 400; font-size: 19px; }
+  .facts .cost span { font-family: 'Archivo Black', sans-serif; font-size: 27px; line-height: 1; }
+  .facts .unit { font-size: 11px; font-weight: 700; text-align: right; padding: 2px 0 2px;
+    border-bottom: 1px solid #2b2118; }
+  .facts .row { display: flex; justify-content: space-between; font-size: 15px; line-height: 1;
+    padding: 6px 0 6px; border-bottom: 1px solid #2b2118; }
+  .facts .row b { font-weight: 700; }
+  .facts .row.last { border-bottom: 0; }
+  .facts .note { font-size: 12.5px; font-weight: 500; line-height: 1.25; margin-top: 4px; }
+</style>
+</head>
+<body>
+  <div class="banner">
+    <div class="specs">Python · CLI · MIT</div>
+    <div class="title">SKILLABEL</div>
+    <div class="tagline">Nutrition labels for agent skills.<br>Read the label before you run it.</div>
+
+    <!-- The real label of the sample skill text-tidier, from `skillabel scan tests/fixtures` -->
+    <div class="facts">
+      <h1>Skill Facts</h1>
+      <div class="serving">1 skill: text-tidier</div>
+      <div class="bar"></div>
+      <div class="cost"><b>Costs</b><span>190</span></div>
+      <div class="unit">tokens, estimated</div>
+      <div class="row"><b>Runs shell</b><span>yes</span></div>
+      <div class="row"><b>Writes files</b><span>yes</span></div>
+      <div class="row"><b>Network</b><span>yes</span></div>
+      <div class="row last"><b>Sends external</b><span>no</span></div>
+      <div class="bar thin"></div>
+      <div class="row last"><b>Lints</b><span>0 errors, 2 warnings</span></div>
+      <div class="bar thin"></div>
+      <div class="note">Evidence, never verdicts.</div>
+    </div>
+  </div>
+</body>
+</html>

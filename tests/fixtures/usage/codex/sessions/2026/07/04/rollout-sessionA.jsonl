@@ -1,0 +1,6 @@
+{"type":"session_meta","timestamp":"2026-07-04T07:59:00.000Z","payload":{"id":"A","cwd":"C:/proj"}}
+{"type":"response_item","timestamp":"2026-07-04T07:59:30.000Z","payload":{"type":"message","role":"user","content":[{"type":"text","text":"Available skills catalog (file: /home/.codex/skills/tdd/SKILL.md) (file: /home/.codex/skills/documents/SKILL.md)"}]}}
+{"type":"turn_context","timestamp":"2026-07-04T07:59:40.000Z","payload":{"user_instructions":"After deciding to use a skill, open its SKILL.md. Catalog lists skills/tdd/SKILL.md and skills/documents/SKILL.md but this is not usage."}}
+{"type":"response_item","timestamp":"2026-07-04T08:00:00.000Z","payload":{"type":"function_call","name":"shell_command","arguments":"{\"command\":\"Get-Content -Path skills/tdd/SKILL.md\",\"workdir\":\"C:/proj\"}","call_id":"c1"}}
+{"type":"response_item","timestamp":"2026-07-04T08:05:00.000Z","payload":{"type":"function_call","name":"shell_command","arguments":"{\"command\":\"cat skills/tdd/SKILL.md\"}","call_id":"c2"}}
+{"type":"response_item","timestamp":"2026-07-04T08:10:00.000Z","payload":{"type":"function_call","name":"shell_command","arguments":"{\"command\":\"Get-Content -Path skills/documents/SKILL.md\"}","call_id":"c3"}}

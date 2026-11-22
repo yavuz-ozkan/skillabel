@@ -1,0 +1,192 @@
+name: "Skillabel"
+description: "Nutrition labels for agent skills: scan changed SKILL.md files and post one sticky PR comment with each skill's label. Surface area with evidence, never verdicts."
+author: "skillabel"
+branding:
+  icon: "tag"
+  color: "gray-dark"
+
+inputs:
+  path:
+    description: "Directory to scan — a single skill dir or a repo subtree containing SKILL.md files."
+    required: false
+    default: "."
+  mode:
+    description: "lint = objective deterministic checks only (safe rollout default). full = also run AI extraction + report card (needs a provider key in the caller's env)."
+    required: false
+    default: "lint"
+  strict:
+    description: "When true, lint fails the check on warnings too, not just errors."
+    required: false
+    default: "false"
+  model:
+    description: "AI model id used when mode: full."
+    required: false
+    default: "claude-sonnet-5"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+      with:
+        python-version: "3.12"
+
+    - name: Install skillabel
+      shell: bash
+      run: |
+        # Dependencies: the exact versions in uv.lock (and the hatchling build
+        # backend), each checked against its hash. tests/test_action_requirements.py
+        # fails when these files and uv.lock disagree.
+        # skillabel itself: from this action's own checked-out source and from
+        # nowhere else. The name "skillabel" is never looked up on a package
+        # index, so the code that runs is the code at the ref the caller pinned.
+        # -I keeps the checked-out PR folder off the import path, so a pip/
+        # folder in the PR cannot stand in for the real pip.
+        # --only-binary: ready-made wheels only, so no package's own build
+        # code runs during the install.
+        python -I -m pip install --require-hashes --only-binary :all: \
+          -r "$GITHUB_ACTION_PATH/action-requirements.txt" \
+          -r "$GITHUB_ACTION_PATH/action-build-requirements.txt"
+        python -I -m pip install --no-deps --no-build-isolation "$GITHUB_ACTION_PATH"
+
+    - name: Scan and report
+      id: skillabel
+      shell: bash
+      # mode: full picks up ANTHROPIC_API_KEY / OPENROUTER_API_KEY from the
+      # caller's env automatically (see docs/action.md). No key -> keyless.
+      # Every expression value arrives through env:, never pasted into the
+      # script text, so a value cannot become shell code.
+      env:
+        INPUT_PATH: ${{ inputs.path }}
+        INPUT_MODE: ${{ inputs.mode }}
+        INPUT_MODEL: ${{ inputs.model }}
+        INPUT_STRICT: ${{ inputs.strict }}
+        BASE_REF: ${{ github.base_ref }}
+      run: |
+        set -e
+        PATH_IN="${INPUT_PATH:-.}"
+        # Everything this action writes goes to its own fresh folder under
+        # $RUNNER_TEMP, never into the checked-out PR, so a link the PR plants
+        # cannot redirect a write. Only labels written by this run are in it.
+        WORK="${RUNNER_TEMP:?}/skillabel"
+        rm -rf -- "$WORK"
+        mkdir -p -- "$WORK"
+        # The folder to scan must not go through a link the PR planted. It is
+        # a path inside the checkout; each part of it is checked.
+        case "/$PATH_IN/" in
+          //*|*/../*|*\\*|*:*)
+            echo "::error::skillabel: the path input must be a relative path inside the checkout, with no '..'."
+            exit 1 ;;
+        esac
+        # With "skills/", [ -L ] would follow the link, so drop trailing slashes.
+        while [ "${PATH_IN%/}" != "$PATH_IN" ]; do PATH_IN="${PATH_IN%/}"; done
+        PATH_IN="${PATH_IN:-.}"
+        CHECK="$PATH_IN"
+        while [ -n "$CHECK" ] && [ "$CHECK" != "." ] && [ "$CHECK" != "/" ]; do
+          if [ -L "$CHECK" ]; then
+            echo "::error::skillabel: the path input goes through a link ($CHECK); not scanning it."
+            exit 1
+          fi
+          CHECK=$(dirname -- "$CHECK")
+        done
+        # Text from a skill (a name, a path) is printed below. GitHub reads a
+        # log line that starts with "::" as a workflow command, so a skill
+        # could fake a notice or an error. Stop command processing with a
+        # random token for the rest of this step; resume it on exit, even
+        # after a failure.
+        TOKEN=$(python -I -c "import secrets; print(secrets.token_hex(16))")
+        if [ -z "$TOKEN" ]; then echo "::error::skillabel: could not make a random token."; exit 1; fi
+        trap 'printf "\n::%s::\n" "$TOKEN"' EXIT
+        echo "::stop-commands::$TOKEN"
+        if [ "$INPUT_MODE" = "full" ]; then
+          skillabel scan --ai --model "$INPUT_MODEL" --out "$WORK" -- "$PATH_IN"
+        else
+          skillabel scan --out "$WORK" -- "$PATH_IN"
+        fi
+        skillabel report --out "$WORK/skillabel-report.html" -- "$WORK"
+
+        # The files the PR changed (best-effort; an empty file means all
+        # skills). NUL-separated, written straight to the file, so a folder
+        # name with a space or a newline stays whole. skillabel.comment picks
+        # out the skill folders in Python.
+        : > "$WORK/changed_files.z"
+        if [ -n "$BASE_REF" ]; then
+          git fetch --no-tags --depth=1 origin "$BASE_REF" 2>/dev/null || true
+          git diff -z --name-only "origin/$BASE_REF" HEAD -- > "$WORK/changed_files.z" 2>/dev/null \
+            || : > "$WORK/changed_files.z"
+        fi
+
+        # Run the lint gate WITHOUT aborting the job, so the comment still posts.
+        STRICT_FLAG=""
+        [ "$INPUT_STRICT" = "true" ] && STRICT_FLAG="--strict"
+        set +e
+        skillabel lint $STRICT_FLAG -- "$PATH_IN"
+        echo "lint_exit=$?" >> "$GITHUB_OUTPUT"
+        set -e
+
+    - name: Build sticky comment
+      shell: bash
+      # The builder lives in the package (skillabel/comment.py). -I keeps the
+      # checked-out PR folder off the import path, so a skillabel/ folder in
+      # the PR cannot stand in for the installed one.
+      env:
+        INPUT_PATH: ${{ inputs.path }}
+        INPUT_MODE: ${{ inputs.mode }}
+      # It reads the labels and changed_files.z from the work folder and
+      # writes comment.md there.
+      run: |
+        set -e
+        WORK="${RUNNER_TEMP:?}/skillabel"
+        # As in the scan step: nothing printed here is read as a command.
+        TOKEN=$(python -I -c "import secrets; print(secrets.token_hex(16))")
+        if [ -z "$TOKEN" ]; then echo "::error::skillabel: could not make a random token."; exit 1; fi
+        trap 'printf "\n::%s::\n" "$TOKEN"' EXIT
+        echo "::stop-commands::$TOKEN"
+        python -I -m skillabel.comment "$WORK" "$INPUT_MODE" "$WORK"
+
+    - name: Post sticky PR comment
+      if: ${{ github.event_name == 'pull_request' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        REPO_NAME: ${{ github.repository }}
+      run: |
+        MARKER="<!-- skillabel -->"
+        WORK="${RUNNER_TEMP:?}/skillabel"
+        PR="$PR_NUMBER"
+        REPO="$REPO_NAME"
+        # Find our existing comment and update it in place; else create one.
+        # Only a comment written by this job's own bot account counts: anyone
+        # can post a comment that holds the marker.
+        CID=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+          --jq ".[] | select(.user.login == \"github-actions[bot]\" and .user.type == \"Bot\" and (.body | contains(\"$MARKER\"))) | .id")
+        CID="${CID%%$'\n'*}"  # the first one, if there are several
+        if [ -n "$CID" ]; then
+          gh api -X PATCH "repos/$REPO/issues/comments/$CID" -F body=@"$WORK/comment.md" >/dev/null
+          echo "Updated sticky comment $CID"
+        else
+          gh api -X POST "repos/$REPO/issues/$PR/comments" -F body=@"$WORK/comment.md" >/dev/null
+          echo "Created sticky comment"
+        fi
+
+    - name: Upload HTML report
+      if: ${{ always() }}
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      # Only the report this run wrote, from the action's own work folder.
+      with:
+        name: skillabel-report
+        path: ${{ runner.temp }}/skillabel/skillabel-report.html
+        if-no-files-found: ignore
+
+    - name: Enforce lint gate
+      shell: bash
+      env:
+        LINT_EXIT: ${{ steps.skillabel.outputs.lint_exit }}
+      run: |
+        CODE="$LINT_EXIT"
+        if [ "$CODE" != "0" ]; then
+          echo "::error::skillabel lint failed (exit $CODE)."
+          exit 1
+        fi
+        echo "skillabel lint passed."
