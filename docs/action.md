@@ -54,7 +54,7 @@ the report card. `full` needs a provider key (below).
 | `path` | `.` | Directory to scan (a skill dir or a subtree with `SKILL.md` files). |
 | `mode` | `lint` | `lint` = objective checks only. `full` = also AI extraction + report card. |
 | `strict` | `false` | Fail on lint warnings too, not just errors. See [What `strict` adds](#what-strict-adds). |
-| `model` | `claude-sonnet-5` | AI model id used when `mode: full`. |
+| `model` | `claude-sonnet-5` | AI model id used when `mode: full`: `claude-sonnet-5`, `claude-sonnet-5-5`, `claude-opus-5-5`, `claude-opus-4-8`, `claude-haiku-5-5` or `claude-haiku-4-5`. Any other value uses the default. |
 
 ### What `strict` adds
 

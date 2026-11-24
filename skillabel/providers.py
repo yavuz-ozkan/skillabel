@@ -28,14 +28,22 @@ from pydantic import BaseModel
 
 M = TypeVar("M", bound=BaseModel)
 
+# The default stays on the model the extraction was tuned and checked with
+# until a real run on a newer one shows the same quality.
 DEFAULT_MODEL = "claude-sonnet-5"
-ALLOWED_MODELS = {"claude-sonnet-5", "claude-opus-4-8", "claude-haiku-4-5"}
+ALLOWED_MODELS = {
+    "claude-sonnet-5", "claude-opus-4-8", "claude-haiku-4-5",
+    "claude-sonnet-5-5", "claude-opus-5-5", "claude-haiku-5-5",
+}
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 OPENROUTER_MODEL_MAP = {
     "claude-sonnet-5": "anthropic/claude-sonnet-5",
     "claude-opus-4-8": "anthropic/claude-opus-4.8",
     "claude-haiku-4-5": "anthropic/claude-haiku-4.5",
+    "claude-sonnet-5-5": "anthropic/claude-sonnet-5.5",
+    "claude-opus-5-5": "anthropic/claude-opus-5.5",
+    "claude-haiku-5-5": "anthropic/claude-haiku-5.5",
 }
 _FENCE_RE = re.compile(r"^\s*```(?:json)?\s*|\s*```\s*$")
 

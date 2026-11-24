@@ -239,11 +239,21 @@ async def test_model_gate_falls_back_to_default():
     assert DEFAULT_MODEL in ALLOWED_MODELS
 
 
-async def test_allowed_model_is_passed_through():
+@pytest.mark.parametrize("chosen", ["claude-opus-4-8", "claude-sonnet-5-5", "claude-opus-5-5", "claude-haiku-5-5"])
+async def test_allowed_model_is_passed_through(chosen):
     provider = FakeProvider(full_extraction())
-    chosen = "claude-opus-4-8"
     assert chosen in ALLOWED_MODELS
 
     await enrich(base_label(), make_parsed(), model=chosen, provider=provider)
 
     assert all(m == chosen for m in provider.models)
+
+
+def test_every_allowed_model_has_an_openrouter_name():
+    from skillabel.providers import OPENROUTER_MODEL_MAP
+
+    assert set(OPENROUTER_MODEL_MAP) == ALLOWED_MODELS
+    for model, slug in OPENROUTER_MODEL_MAP.items():
+        # Anthropic's "claude-x-5-5" is OpenRouter's "anthropic/claude-x-5.5".
+        head, _, minor = model.rpartition("-")
+        assert slug == f"anthropic/{head}.{minor}" or slug == f"anthropic/{model}", (model, slug)
