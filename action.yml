@@ -19,7 +19,7 @@ inputs:
     required: false
     default: "false"
   model:
-    description: "AI model id used when mode: full."
+    description: "AI model id used when mode: full: claude-sonnet-5, claude-sonnet-5-5, claude-opus-5-5, claude-opus-4-8, claude-haiku-5-5 or claude-haiku-4-5. Any other value uses the default."
     required: false
     default: "claude-sonnet-5"
 

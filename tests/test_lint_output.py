@@ -62,4 +62,32 @@ def test_clean_lint_says_so_in_plain_ascii(monkeypatch):
     monkeypatch.setattr(cli.console, "_width", 80)
     r = runner.invoke(cli.app, ["lint", str(FIXTURES / "wellformed")])
     assert r.exit_code == 0, r.output
-    assert "No lint findings - clean." in r.output or "warning: " in r.output
+    assert "No lint findings - clean." in r.output
+
+
+def test_a_long_skill_name_is_not_cut_in_the_table(tmp_path, monkeypatch):
+    """The old table cut the skill column with "..."; it now wraps."""
+    from test_hostile import skill
+
+    name = "a-very-long-skill-name-that-would-not-fit-in-a-narrow-table-column-at-all"
+    skill(tmp_path / "s", name, "Hello.")
+    monkeypatch.setattr(cli.console, "_width", 120)
+    r = runner.invoke(cli.app, ["lint", str(tmp_path)])
+    assert "Skillabel lints" in r.output and "…" not in r.output
+    # Read the Skill column (the fourth cell of each row) down the table.
+    cells = [ln.split("│")[4].strip() for ln in r.output.splitlines() if ln.count("│") == 6]
+    assert name in "".join(cells[1:]), cells  # cells[0] is the header
+
+
+@pytest.mark.parametrize("width", [80, 200])
+def test_hostile_text_in_a_message_is_shown_not_obeyed(tmp_path, monkeypatch, width):
+    """A finding message quotes skill text (here a dead link's path). Its
+    control characters and Rich markup print as text, in both layouts."""
+    from test_hostile import skill
+
+    skill(tmp_path / "s", "s", "See [the guide](\x1b[2Jfake[bold]x[/bold].md).")
+    monkeypatch.setattr(cli.console, "_width", width)
+    r = runner.invoke(cli.app, ["lint", str(tmp_path)])
+    assert "dead-reference" in r.output, r.output
+    assert "\x1b" not in r.output and "\\x1b" in r.output.replace("\n", "").replace("│", "").replace(" ", "")
+    assert "[bold]" in r.output.replace("\n", "").replace("│", "").replace(" ", "")
