@@ -354,7 +354,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with: { fetch-depth: 0 }
-      - uses: yavuz-ozkan/skillabel@v0.3.0
+      - uses: yavuz-ozkan/skillabel@v0.3.1
         with:
           path: skills
           mode: lint        # start here — see the rollout note
@@ -377,7 +377,7 @@ skill written to look like a workflow command (`::error::`) made no fake
 annotation. `mode: full` has not been run on GitHub yet.
 
 A tag can be moved; a commit ID cannot. To be sure of the code you run, pin
-the full commit ID that `v0.3.0` points to, with the tag in a comment.
+the full commit ID that `v0.3.1` points to, with the tag in a comment.
 
 ## Demo
 

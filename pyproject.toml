@@ -1,6 +1,6 @@
 [project]
 name = "skillabel"
-version = "0.3.0"
+version = "0.3.1"
 description = "Nutrition labels, audit surface, and report cards for AI agent skills"
 requires-python = ">=3.12"
 license = "MIT"

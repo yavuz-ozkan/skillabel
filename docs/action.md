@@ -97,7 +97,7 @@ source with `--no-deps --no-build-isolation`. A test fails when those files and
 Referencing the action by ref is all it needs:
 
 ```yaml
-- uses: yavuz-ozkan/skillabel@v0.3.0
+- uses: yavuz-ozkan/skillabel@v0.3.1
 ```
 
 A tag can be moved; a commit ID cannot. To be sure of the code you run, pin
@@ -107,7 +107,7 @@ The same install done by hand in a workflow, if you prefer to pin it yourself:
 
 ```yaml
 - uses: actions/checkout@v7
-  with: { repository: yavuz-ozkan/skillabel, ref: v0.3.0, path: .skillabel-src }
+  with: { repository: yavuz-ozkan/skillabel, ref: v0.3.1, path: .skillabel-src }
 - run: |
     pip install --require-hashes --only-binary :all: \
       -r .skillabel-src/action-requirements.txt -r .skillabel-src/action-build-requirements.txt
@@ -136,7 +136,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with: { fetch-depth: 0 }   # lets the action diff changed SKILL.md files
-      - uses: yavuz-ozkan/skillabel@v0.3.0
+      - uses: yavuz-ozkan/skillabel@v0.3.1
         with:
           path: skills
           mode: lint
@@ -150,7 +150,7 @@ jobs:
 `env:`:
 
 ```yaml
-      - uses: yavuz-ozkan/skillabel@v0.3.0
+      - uses: yavuz-ozkan/skillabel@v0.3.1
         with:
           path: skills
           mode: full
