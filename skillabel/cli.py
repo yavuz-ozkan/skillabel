@@ -72,6 +72,9 @@ console = Console(emoji=False)
 err_console = Console(stderr=True, emoji=False)
 
 _SEV_STYLE = {"error": "bold red", "warning": "yellow", "info": "dim"}
+# Below this many columns, `lint` prints one plain line per finding instead of
+# a table, whose message column would be cut short.
+_LINT_TABLE_MIN_WIDTH = 120
 
 
 def _refuse(exc: UnsafePathError) -> None:
@@ -629,37 +632,45 @@ def lint(
         err_console.print(f"[yellow]No SKILL.md found under {safe(path)}.[/yellow]")
         raise typer.Exit(code=0)
 
-    table = Table(title="Skillabel lints", show_lines=False, header_style="bold")
-    table.add_column("Rule", style="cyan", no_wrap=True)
-    table.add_column("Severity", no_wrap=True)
-    table.add_column("Line", justify="right", no_wrap=True)
-    table.add_column("Skill", style="magenta", no_wrap=True)
-    table.add_column("Message")
-
     errors = 0
     warnings = 0
-    findings = 0
+    rows: list[tuple[str, str, str, str, str]] = []
     labels = [safe_build(skill_path)[0] for skill_path in skills] + not_checked
     for label in labels:
         for finding in label.lints:
-            findings += 1
             if finding.severity == "error":
                 errors += 1
             elif finding.severity == "warning":
                 warnings += 1
             style = _SEV_STYLE.get(finding.severity, "white")
-            table.add_row(
+            rows.append((
                 safe(finding.rule),
                 f"[{style}]{safe(finding.severity)}[/{style}]",
-                str(finding.line) if finding.line is not None else "—",
+                str(finding.line) if finding.line is not None else "-",
                 safe(label.name),
                 safe(finding.message),
-            )
+            ))
 
-    if findings:
+    if not rows:
+        console.print("[green]No lint findings - clean.[/green]")
+    elif console.width >= _LINT_TABLE_MIN_WIDTH:
+        # Wide enough for a table. Messages wrap, never cut short.
+        table = Table(title="Skillabel lints", show_lines=False, header_style="bold")
+        table.add_column("Rule", style="cyan", no_wrap=True)
+        table.add_column("Severity", no_wrap=True)
+        table.add_column("Line", justify="right", no_wrap=True)
+        table.add_column("Skill", style="magenta", overflow="fold")
+        table.add_column("Message", overflow="fold")
+        for row in rows:
+            table.add_row(*row)
         console.print(table)
     else:
-        console.print("[green]No lint findings — clean.[/green]")
+        # A narrow terminal or a CI log: one plain line per finding, like a
+        # compiler, so no message is cut off.
+        for rule, severity, line, name, message in rows:
+            where = f" (line {line})" if line != "-" else ""
+            console.print(f"{severity}: [magenta]{name}[/magenta]: [cyan]{rule}[/cyan]{where}: {message}",
+                          soft_wrap=True)
 
     console.print(
         f"\n{len(skills)} skill(s) - "
