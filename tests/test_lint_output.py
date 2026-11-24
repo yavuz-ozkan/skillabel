@@ -75,8 +75,9 @@ def test_a_long_skill_name_is_not_cut_in_the_table(tmp_path, monkeypatch):
     r = runner.invoke(cli.app, ["lint", str(tmp_path)])
     assert "Skillabel lints" in r.output and "…" not in r.output
     # Read the Skill column (the fourth cell of each row) down the table.
+    # The header row's bars differ by platform, so it is skipped by its text.
     cells = [ln.split("│")[4].strip() for ln in r.output.splitlines() if ln.count("│") == 6]
-    assert name in "".join(cells[1:]), cells  # cells[0] is the header
+    assert name in "".join(c for c in cells if c != "Skill"), cells
 
 
 @pytest.mark.parametrize("width", [80, 200])
