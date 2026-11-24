@@ -53,8 +53,32 @@ the report card. `full` needs a provider key (below).
 |---|---|---|
 | `path` | `.` | Directory to scan (a skill dir or a subtree with `SKILL.md` files). |
 | `mode` | `lint` | `lint` = objective checks only. `full` = also AI extraction + report card. |
-| `strict` | `false` | Fail on lint warnings too, not just errors. Since the security fixes, warnings also cover files skillabel would not read: `linked-file` (a bundled link), `too-big`, `long-line`, `not-utf8`, `utf16-text`, `too-many-files`, `nested-too-deep`, `not-regular-file`, `could-not-read`, `lookalike-letters`, `outside-reference` (the skill's text, frontmatter included, or a bundled `.md`, `.txt`, `.rst`, `.adoc`, `.yaml`, `.yml`, `.json`, `.toml` or `.html` file (scripts are not read for pointers), points with `..` to a file outside the skill folder, or to another machine; skillabel does not read it; best effort. An honest pointer to a shared file next to the skill, such as `../shared/helpers.md`, counts too, so it fails `strict`. A home, system or absolute path is the same finding as info, so it does not fail `strict`). A skill folder that was not checked counts too: one that is a link or junction (`linked-skill-folder`) or one named like a `.env` file (`env-named-folder`). A linked or unreadable `SKILL.md` is an error, so it fails the gate even without `strict`. Bundled text past the per-skill line budget is listed as not read, not as a lint. |
+| `strict` | `false` | Fail on lint warnings too, not just errors. See [What `strict` adds](#what-strict-adds). |
 | `model` | `claude-sonnet-5` | AI model id used when `mode: full`. |
+
+### What `strict` adds
+
+Without `strict`, only errors fail the check. A linked or unreadable `SKILL.md`
+is an error, so it fails the gate either way. With `strict`, warnings fail it
+too. Besides the writing lints, warnings cover:
+
+- Files skillabel would not read: `linked-file` (a bundled link), `too-big`,
+  `long-line`, `not-utf8`, `utf16-text`, `too-many-files`, `nested-too-deep`,
+  `not-regular-file`, `could-not-read`.
+- `lookalike-letters`: a word in `SKILL.md` mixes Latin letters with Cyrillic
+  or Greek ones that look the same.
+- `outside-reference`: the skill's text (frontmatter included) or a bundled
+  `.md`, `.txt`, `.rst`, `.adoc`, `.yaml`, `.yml`, `.json`, `.toml` or `.html`
+  file points with `..` to a file outside the skill folder, or to another
+  machine. Skillabel does not read it; this is best effort, and scripts are not
+  read for pointers. An honest pointer to a shared file next to the skill, such
+  as `../shared/helpers.md`, counts too. A home, system or absolute path is the
+  same finding as info, so it does not fail `strict`.
+- Skill folders that were not checked: one that is a link or junction
+  (`linked-skill-folder`) or one named like a `.env` file (`env-named-folder`).
+
+Bundled text past the per-skill line budget is listed as not read, not as a
+lint.
 
 ## Install
 

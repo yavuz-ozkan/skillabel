@@ -5,7 +5,7 @@
 > **Nutrition labels for agent skills** — what a skill needs, what it touches,
 > and what it costs in context, *before* you install it.
 
-![A Skillabel report on the four sample skills that ship in tests/fixtures](docs/screenshot.png)
+![A Skillabel report on the four sample skills that ship in tests/fixtures; each label is named by its skill's frontmatter name, not its folder](docs/screenshot.png)
 
 Everyone shares and installs agent skills; nobody can actually read them. A
 skill is a contract hidden in prose written for a model: when it fires, what it
@@ -31,7 +31,8 @@ With [uv](https://docs.astral.sh/uv/) 0.9 or newer, at the exact versions in
 git clone https://github.com/yavuz-ozkan/skillabel
 cd skillabel
 uv sync --frozen
-source .venv/bin/activate        # Windows PowerShell: .venv\Scripts\Activate.ps1
+source .venv/bin/activate        # Windows Git Bash: source .venv/Scripts/activate
+                                 # Windows PowerShell: .venv\Scripts\Activate.ps1
 ```
 
 Or with pip, also at the exact locked versions, each checked against its hash
@@ -42,7 +43,8 @@ allow):
 git clone https://github.com/yavuz-ozkan/skillabel
 cd skillabel
 python -m venv .venv
-source .venv/bin/activate        # Windows PowerShell: .venv\Scripts\Activate.ps1
+source .venv/bin/activate        # Windows Git Bash: source .venv/Scripts/activate
+                                 # Windows PowerShell: .venv\Scripts\Activate.ps1
 pip install --require-hashes --only-binary :all: -r action-requirements.txt -r action-build-requirements.txt
 pip install --no-deps --no-build-isolation .
 ```
@@ -55,8 +57,15 @@ skillabel report tests/fixtures
 ```
 
 These label the four sample skills that ship with the repo and write
-`~/skillabel-reports/skillabel-report.html`. Open that file in a browser to see
-the report shown above.
+`~/skillabel-reports/skillabel-report.html` (on Windows,
+`C:\Users\<you>\skillabel-reports\skillabel-report.html`; the command prints
+the full path). Open that file in a browser to see the report shown above.
+`scan` keeps the labels in a `.skillabel/` folder inside the folder it scans,
+here `tests/fixtures/.skillabel/`; git ignores it.
+
+Some sample skills are broken on purpose, so `skillabel lint tests/fixtures`
+reports errors and exits 1. That is expected; try it on
+`tests/fixtures/wellformed` for a clean pass.
 
 ### Run it safely on a folder you are checking
 
